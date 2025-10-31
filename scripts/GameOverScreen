@@ -1,0 +1,61 @@
+using TMPro;
+using UnityEngine;
+
+public class GameOverScreen : MonoBehaviour
+{
+    // Referentie naar de EnemySpawner om de huidige wave (ronde) te kunnen ophalen
+    EnemySpawner enemySpawner;
+
+    // UI-tekstcomponent waarin de score (wave) wordt weergegeven
+    public TextMeshProUGUI display;
+
+    // Referentie naar de GameHandeler om spelgegevens op te slaan
+    GameHandeler handeler;
+
+    // Het paneel dat de Game Over UI bevat
+    public GameObject uiPanel;
+
+    // Houdt bij tot welke wave de speler is gekomen
+    int wave;
+
+
+
+    private void Start()
+    {
+        // Zoekt automatisch de EnemySpawner en GameHandeler in de scene
+        enemySpawner = FindObjectOfType<EnemySpawner>();
+        handeler = FindObjectOfType<GameHandeler>();
+
+        // Zorgt ervoor dat het spel actief draait bij de start (voor het geval het eerder gepauzeerd was)
+        Time.timeScale = 1f;
+    }
+
+    public void Update()
+    {
+        // Haal de huidige wave op van de EnemySpawner
+        wave = enemySpawner.GetCurrentWave();
+
+        // Toon de wave als 'Score' in de UI
+        display.text = "Score: " + wave.ToString();
+    }
+
+
+    // Wordt aangeroepen wanneer het Game Over-scherm moet worden getoond
+    public void ScreenSetup()
+    {
+        // Activeer het Game Over-paneel in de UI
+        uiPanel.SetActive(true);
+
+        // Update de score op het scherm met de laatste wave
+        display.text = "Score: " + wave.ToString();
+
+        // Pauzeer het spel
+        Time.timeScale = 0f;
+
+        // Zet 'newGame' op true om aan te geven dat een nieuw spel gestart kan worden
+        handeler.data.newGame = true;
+
+        // Sla de huidige spelerdata op
+        handeler.SavePlayerData();
+    }
+}

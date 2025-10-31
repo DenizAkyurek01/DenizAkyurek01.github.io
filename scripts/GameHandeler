@@ -1,0 +1,144 @@
+using System.IO;
+using UnityEngine;
+
+public class GameHandeler : MonoBehaviour
+{
+    // Bevat alle gegevens die opgeslagen of geladen worden
+    public Data data = new Data();
+
+    // Referenties naar andere belangrijke onderdelen
+    EnemySpawner enemySpawner;
+    PlayerHealth playerHealth;
+
+    // Transform van de speler, zodat we positie kunnen opslaan of herstellen
+    public Transform player;
+
+    // Pad waar het JSON-bestand wordt opgeslagen (platform-onafhankelijk)
+    private string path;
+
+    // Klasse die de opgeslagen gegevens voorstelt
+    [System.Serializable]
+    public class Data
+    {
+        public float health = 100f;   // Gezondheid van de speler
+        public Vector3 position;      // Positie van de speler in de wereld
+        public int wave = 1;          // Huidige wave (ronde)
+        public bool newGame = true;   // Of het een nieuw spel is
+    }
+
+    private void Start()
+    {
+        // Gebruik persistentDataPath zodat het ook werkt op Android/iOS
+        path = Application.persistentDataPath + "/data.json";
+
+        // Zoek automatisch de EnemySpawner en PlayerHealth in de scene
+        enemySpawner = FindObjectOfType<EnemySpawner>();
+        playerHealth = player.GetComponent<PlayerHealth>();
+
+        // Laad eerder opgeslagen data (indien aanwezig)
+        LoadPlayerData();
+    }
+
+    public void Update()
+    {
+        // Als de speler dood is, markeer dit als een nieuw spel
+        if (playerHealth.health <= 0)
+        {
+            data.newGame = true;
+        }
+    }
+
+    // Wordt automatisch uitgevoerd als het spel afgesloten wordt
+    void OnApplicationQuit()
+    {
+        SavePlayerData();
+    }
+
+    // Slaat alle spelergegevens op in een JSON-bestand
+    public void SavePlayerData()
+    {
+        // Bewaar positie van speler
+        if (player != null)
+        {
+            data.position = player.position;
+        }
+
+        // Bewaar gezondheid van speler en bepaal of het een nieuw spel is
+        if (playerHealth != null)
+        {
+            data.health = playerHealth.health;
+
+            if (playerHealth.health <= 0)
+            {
+                data.newGame = true;
+            }
+            else
+            {
+                data.newGame = false;
+            }
+        }
+
+        // Zet de data om in JSON-formaat
+        string json = JsonUtility.ToJson(data, true);
+
+        // Schrijf het JSON-bestand weg naar de schijf
+        File.WriteAllText(path, json);
+    }
+
+    // Laadt spelergegevens uit een JSON-bestand
+    public void LoadPlayerData()
+    {
+        if (File.Exists(path))
+        {
+            // Lees de JSON-inhoud
+            string json = File.ReadAllText(path);
+
+            // Zet het terug om naar een Data-object
+            data = JsonUtility.FromJson<Data>(json);
+
+            // Herstel positie en gezondheid als ze bestaan
+            if (player != null)
+            {
+                player.position = data.position;
+            }
+
+            if (playerHealth != null)
+            {
+                playerHealth.health = data.health;
+            }
+
+            Debug.Log("Spelerdata geladen van: " + path);
+        }
+        else
+        {
+            // Als er nog geen save-bestand bestaat, begin dan opnieuw
+            player.position = Vector3.zero;
+            data.newGame = true;
+
+            Debug.LogWarning("Geen save-bestand gevonden, start nieuw spel.");
+        }
+    }
+
+
+    // Controleert of de speler dood is om te markeren als nieuw spel
+    public void IsNewGame()
+    {
+        if (playerHealth.health <= 0)
+        {
+            data.newGame = true;
+        }
+    }
+
+    // Reset alle gegevens naar standaardwaarden en sla ze op
+    public void ResetDataForNewGame()
+    {
+        data.health = 100f;
+        data.position = Vector3.zero;
+        data.wave = 1;
+        data.newGame = true;
+
+        SavePlayerData();
+
+        Debug.Log("Data gereset voor nieuw spel.");
+    }
+}

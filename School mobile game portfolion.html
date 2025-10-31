@@ -36,7 +36,6 @@
 
                 <ul class="list-disc list-inside mb-4 space-y-2 text-slate-200">
                     <li><strong>Mijn geleverde werk:</strong> Movement, JSON-bestanden en UI.</li>
-                    <li><strong>Wat ik deed:</strong> Movement, vijanden laten lopen met AI en het schiet-systeem maken.</li>
                     <li><strong>Tools:</strong> Unity, C#, Git</li>
                     <li><strong>Resultaat:</strong> Werkend prototype: je kunt vrij rondlopen, zombies schieten en proberen te overleven. Werkend apk op android telefoon</li>
                 </ul>
@@ -69,5 +68,384 @@
             </div>
         </div>
     </section>
+
+    <section class="flex justify-center items-center mt-12">
+        <div class="max-w-3xl w-full bg-black/50 rounded-xl p-8 backdrop-blur-sm shadow-lg border border-gray-700">
+            <h2 class="font-bold text-2xl md:text-3xl mb-4 text-slate-100 text-center">C# Scripts</h2>
+            <div class="text-slate-200">
+                <select id="scriptSelect" class="w-full bg-black/50 text-slate-100 rounded-lg p-2 mb-4 border border-gray-700">
+                    <option value="">Select a script to view</option>
+                    <option value="movement">Player Movement Script</option>
+                    <option value="GameOverScreen">GameOverScreen</option>
+                    <option value="GameHandeler">GameHandeler</option>
+                    <option value="SceneSwitcher">SceneSwitcher</option>
+                </select>
+                
+                <pre id="codeDisplay" class="hidden bg-black/70 p-4 rounded-lg overflow-x-auto">
+                    <code id="codeContent" class="text-slate-100 text-sm"></code>
+                </pre>
+            </div>
+        </div>
+    </section>
+
+    <script>
+    const scripts = {
+        movement: `using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PlayerMovement : MonoBehaviour
+{
+    public float moveSpeed = 3f;
+    private Vector3 moveInput;//hier word er een vector 3 aangemaakt met als naam moveInput
+    private Rigidbody2D rb;
+
+    public void Start()
+    {
+        rb = GetComponent<Rigidbody2D>();
+    }
+
+    public void OnMove(InputAction.CallbackContext context)//dit word word automatisch aangeroepen door de input systeem telkens wanneer de joystick beweegt
+    {
+        moveInput = context.ReadValue<Vector2>();//hier word de joystick waarde gelezen
+    }
+
+    private void FixedUpdate()//dit runt op elke frame
+    {
+        Vector2 move = moveInput * moveSpeed;//hier word de moveInput en movespeed met elkaar vermenigvuldigd en in move gezet
+        rb.MovePosition(rb.position + move * Time.fixedDeltaTime);//dit laat de player gecontroleerd bewegen in de richting van de joystick, waar muren en colliders ook worden gecheckt waardoor het niet glitched als het tegen de muur aanloopt
+    }
+}
+`
+,
+        GameOverScreen: `using TMPro;
+using UnityEngine;
+
+public class GameOverScreen : MonoBehaviour
+{
+    // Referentie naar de EnemySpawner om de huidige wave (ronde) te kunnen ophalen
+    EnemySpawner enemySpawner;
+
+    // UI-tekstcomponent waarin de score (wave) wordt weergegeven
+    public TextMeshProUGUI display;
+
+    // Referentie naar de GameHandeler om spelgegevens op te slaan
+    GameHandeler handeler;
+
+    // Het paneel dat de Game Over UI bevat
+    public GameObject uiPanel;
+
+    // Houdt bij tot welke wave de speler is gekomen
+    int wave;
+
+
+
+    private void Start()
+    {
+        // Zoekt automatisch de EnemySpawner en GameHandeler in de scene
+        enemySpawner = FindObjectOfType<EnemySpawner>();
+        handeler = FindObjectOfType<GameHandeler>();
+
+        // Zorgt ervoor dat het spel actief draait bij de start (voor het geval het eerder gepauzeerd was)
+        Time.timeScale = 1f;
+    }
+
+    public void Update()
+    {
+        // Haal de huidige wave op van de EnemySpawner
+        wave = enemySpawner.GetCurrentWave();
+
+        // Toon de wave als 'Score' in de UI
+        display.text = "Score: " + wave.ToString();
+    }
+
+
+    // Wordt aangeroepen wanneer het Game Over-scherm moet worden getoond
+    public void ScreenSetup()
+    {
+        // Activeer het Game Over-paneel in de UI
+        uiPanel.SetActive(true);
+
+        // Update de score op het scherm met de laatste wave
+        display.text = "Score: " + wave.ToString();
+
+        // Pauzeer het spel
+        Time.timeScale = 0f;
+
+        // Zet 'newGame' op true om aan te geven dat een nieuw spel gestart kan worden
+        handeler.data.newGame = true;
+
+        // Sla de huidige spelerdata op
+        handeler.SavePlayerData();
+    }
+}
+`,
+        GameHandeler: `using System.IO;
+using UnityEngine;
+
+public class GameHandeler : MonoBehaviour
+{
+    // Bevat alle gegevens die opgeslagen of geladen worden
+    public Data data = new Data();
+
+    // Referenties naar andere belangrijke onderdelen
+    EnemySpawner enemySpawner;
+    PlayerHealth playerHealth;
+
+    // Transform van de speler, zodat we positie kunnen opslaan of herstellen
+    public Transform player;
+
+    // Pad waar het JSON-bestand wordt opgeslagen (platform-onafhankelijk)
+    private string path;
+
+    // Klasse die de opgeslagen gegevens voorstelt
+    [System.Serializable]
+    public class Data
+    {
+        public float health = 100f;   // Gezondheid van de speler
+        public Vector3 position;      // Positie van de speler in de wereld
+        public int wave = 1;          // Huidige wave (ronde)
+        public bool newGame = true;   // Of het een nieuw spel is
+    }
+
+    private void Start()
+    {
+        // Gebruik persistentDataPath zodat het ook werkt op Android/iOS
+        path = Application.persistentDataPath + "/data.json";
+
+        // Zoek automatisch de EnemySpawner en PlayerHealth in de scene
+        enemySpawner = FindObjectOfType<EnemySpawner>();
+        playerHealth = player.GetComponent<PlayerHealth>();
+
+        // Laad eerder opgeslagen data (indien aanwezig)
+        LoadPlayerData();
+    }
+
+    public void Update()
+    {
+        // Als de speler dood is, markeer dit als een nieuw spel
+        if (playerHealth.health <= 0)
+        {
+            data.newGame = true;
+        }
+    }
+
+    // Wordt automatisch uitgevoerd als het spel afgesloten wordt
+    void OnApplicationQuit()
+    {
+        SavePlayerData();
+    }
+
+    // Slaat alle spelergegevens op in een JSON-bestand
+    public void SavePlayerData()
+    {
+        // Bewaar positie van speler
+        if (player != null)
+        {
+            data.position = player.position;
+        }
+
+        // Bewaar gezondheid van speler en bepaal of het een nieuw spel is
+        if (playerHealth != null)
+        {
+            data.health = playerHealth.health;
+
+            if (playerHealth.health <= 0)
+            {
+                data.newGame = true;
+            }
+            else
+            {
+                data.newGame = false;
+            }
+        }
+
+        // Zet de data om in JSON-formaat
+        string json = JsonUtility.ToJson(data, true);
+
+        // Schrijf het JSON-bestand weg naar de schijf
+        File.WriteAllText(path, json);
+    }
+
+    // Laadt spelergegevens uit een JSON-bestand
+    public void LoadPlayerData()
+    {
+        if (File.Exists(path))
+        {
+            // Lees de JSON-inhoud
+            string json = File.ReadAllText(path);
+
+            // Zet het terug om naar een Data-object
+            data = JsonUtility.FromJson<Data>(json);
+
+            // Herstel positie en gezondheid als ze bestaan
+            if (player != null)
+            {
+                player.position = data.position;
+            }
+
+            if (playerHealth != null)
+            {
+                playerHealth.health = data.health;
+            }
+
+            Debug.Log("Spelerdata geladen van: " + path);
+        }
+        else
+        {
+            // Als er nog geen save-bestand bestaat, begin dan opnieuw
+            player.position = Vector3.zero;
+            data.newGame = true;
+
+            Debug.LogWarning("Geen save-bestand gevonden, start nieuw spel.");
+        }
+    }
+
+
+    // Controleert of de speler dood is om te markeren als nieuw spel
+    public void IsNewGame()
+    {
+        if (playerHealth.health <= 0)
+        {
+            data.newGame = true;
+        }
+    }
+
+    // Reset alle gegevens naar standaardwaarden en sla ze op
+    public void ResetDataForNewGame()
+    {
+        data.health = 100f;
+        data.position = Vector3.zero;
+        data.wave = 1;
+        data.newGame = true;
+
+        SavePlayerData();
+
+        Debug.Log("Data gereset voor nieuw spel.");
+    }
+}
+`,
+        SceneSwitcher: `using System.IO;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class SceneSwitcher : MonoBehaviour
+{
+    // Houdt bij of er een nieuw spel gestart moet worden
+    public static bool isNewGame = false;
+
+    // Referentie naar het eerste pop-up venster (bijv. bevestiging nieuw spel)
+    public GameObject popUp;
+
+    // Referentie naar het tweede pop-up venster (bijv. foutmelding of waarschuwing)
+    public GameObject popUp2;
+
+    // Referentie naar de GameHandeler die de data van de speler beheert
+    GameHandeler gameHandler;
+
+
+    public void Awake()
+    {
+        // Zoek automatisch de GameHandeler in de scene
+        gameHandler = FindObjectOfType<GameHandeler>();
+    }
+
+
+    // Wisselt naar een andere scene op basis van het opgegeven scene-indexnummer
+    public void SceneSwitch(int scene)
+    {
+        if (scene <= 2)
+        {
+            SceneManager.LoadScene(scene);
+        }
+        else if(scene == 3)
+        {
+            Application.Quit();
+        }
+
+    }
+
+
+    // Sluit beide pop-ups (handig voor "cancel" of "ok" knoppen)
+    public void ClosePopUp()
+    {
+        popUp.SetActive(false);
+        popUp2.SetActive(false);
+    }
+
+
+    // Start een volledig nieuw spel
+    public void NewGame()
+    {
+        // Zet de vlag aan zodat andere scripts weten dat dit een nieuw spel is
+        isNewGame = true;
+
+        // Controleer of de GameHandeler bestaat
+        if (gameHandler == null)
+        {
+            return;
+        }
+
+        // Reset de opgeslagen data zodat het spel fris begint
+        gameHandler.ResetDataForNewGame();
+
+        // Laad de hoofdscene van het spel
+        SceneManager.LoadScene("Game");
+    }
+
+
+    // Probeert het spel te starten (laadt opgeslagen data als die bestaat)
+    public void StartGame()
+    {
+        // Controleer of de GameHandeler gevonden is
+        if (gameHandler == null)
+        {
+            Debug.LogError("GameHandler niet gevonden!");
+            return;
+        }
+
+        // Als er nog geen opgeslagen data is, of als 'newGame' actief is,
+        // toon dan een waarschuwing of pop-up
+        if (!File.Exists(Application.dataPath + "/data.json") || gameHandler.data.newGame == true)
+        {
+            PopUp();
+            return;
+        }
+
+        // Als alles in orde is, laad dan de Game-scene
+        SceneManager.LoadScene("Game");
+    }
+
+
+    // Toont de pop-up voor het starten van een nieuw spel
+    public void PopUpNewGame()
+    {
+        if (popUp == null) { return; }
+        popUp.SetActive(true);
+    }
+
+
+    // Toont de pop-up voor algemene meldingen of waarschuwingen
+    public void PopUp()
+    {
+        if (popUp2 == null) { return; }
+        popUp2.SetActive(true);
+    }
+}
+`
+    };
+
+    document.getElementById('scriptSelect').addEventListener('change', function() {
+        const codeDisplay = document.getElementById('codeDisplay');
+        const codeContent = document.getElementById('codeContent');
+        const selectedScript = this.value;
+        
+        if(selectedScript) {
+            codeDisplay.classList.remove('hidden');
+            codeContent.textContent = scripts[selectedScript];
+        } else {
+            codeDisplay.classList.add('hidden');
+        }
+    });
+    </script>
 </body>
 </html>

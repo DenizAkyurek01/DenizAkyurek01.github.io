@@ -1,0 +1,107 @@
+using System.IO;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class SceneSwitcher : MonoBehaviour
+{
+    // Houdt bij of er een nieuw spel gestart moet worden
+    public static bool isNewGame = false;
+
+    // Referentie naar het eerste pop-up venster (bijv. bevestiging nieuw spel)
+    public GameObject popUp;
+
+    // Referentie naar het tweede pop-up venster (bijv. foutmelding of waarschuwing)
+    public GameObject popUp2;
+
+    // Referentie naar de GameHandeler die de data van de speler beheert
+    GameHandeler gameHandler;
+
+
+    public void Awake()
+    {
+        // Zoek automatisch de GameHandeler in de scene
+        gameHandler = FindObjectOfType<GameHandeler>();
+    }
+
+
+    // Wisselt naar een andere scene op basis van het opgegeven scene-indexnummer
+    public void SceneSwitch(int scene)
+    {
+        if (scene <= 2)
+        {
+            SceneManager.LoadScene(scene);
+        }
+        else if(scene == 3)
+        {
+            Application.Quit();
+        }
+
+    }
+
+
+    // Sluit beide pop-ups (handig voor "cancel" of "ok" knoppen)
+    public void ClosePopUp()
+    {
+        popUp.SetActive(false);
+        popUp2.SetActive(false);
+    }
+
+
+    // Start een volledig nieuw spel
+    public void NewGame()
+    {
+        // Zet de vlag aan zodat andere scripts weten dat dit een nieuw spel is
+        isNewGame = true;
+
+        // Controleer of de GameHandeler bestaat
+        if (gameHandler == null)
+        {
+            return;
+        }
+
+        // Reset de opgeslagen data zodat het spel fris begint
+        gameHandler.ResetDataForNewGame();
+
+        // Laad de hoofdscene van het spel
+        SceneManager.LoadScene("Game");
+    }
+
+
+    // Probeert het spel te starten (laadt opgeslagen data als die bestaat)
+    public void StartGame()
+    {
+        // Controleer of de GameHandeler gevonden is
+        if (gameHandler == null)
+        {
+            Debug.LogError("GameHandler niet gevonden!");
+            return;
+        }
+
+        // Als er nog geen opgeslagen data is, of als 'newGame' actief is,
+        // toon dan een waarschuwing of pop-up
+        if (!File.Exists(Application.dataPath + "/data.json") || gameHandler.data.newGame == true)
+        {
+            PopUp();
+            return;
+        }
+
+        // Als alles in orde is, laad dan de Game-scene
+        SceneManager.LoadScene("Game");
+    }
+
+
+    // Toont de pop-up voor het starten van een nieuw spel
+    public void PopUpNewGame()
+    {
+        if (popUp == null) { return; }
+        popUp.SetActive(true);
+    }
+
+
+    // Toont de pop-up voor algemene meldingen of waarschuwingen
+    public void PopUp()
+    {
+        if (popUp2 == null) { return; }
+        popUp2.SetActive(true);
+    }
+}
